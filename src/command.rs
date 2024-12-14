@@ -23,6 +23,16 @@ impl FromStr for Command {
                     Ok(Command {
                         execution: Box::new(move || println!("{}: not found", param)),
                     })
+                } else if Command::programs_on_path().contains_key(param.as_str()) {
+                    Ok(Command {
+                        execution: Box::new(move || {
+                            println!(
+                                "{} is {}",
+                                param,
+                                Command::programs_on_path().get(param.as_str()).unwrap()
+                            )
+                        }),
+                    })
                 } else {
                     Ok(Command {
                         execution: Box::new(move || println!("{} is a shell builtin", param)),
@@ -41,5 +51,20 @@ impl FromStr for Command {
 impl Command {
     pub fn execute(self) {
         (self.execution)();
+    }
+    fn programs_on_path() -> std::collections::HashMap<String, String> {
+        let mut programs = std::collections::HashMap::new();
+        std::env::var("PATH")
+            .unwrap_or_else(|_| "/bin:/usr/bin".to_string())
+            .split(':')
+            .filter_map(|path| std::fs::read_dir(path).ok())
+            .flatten()
+            .for_each(|entry| {
+                let entry = entry.unwrap();
+                let file_name = entry.file_name().into_string().unwrap();
+                let file_path = entry.path().to_string_lossy().to_string();
+                programs.insert(file_name, file_path);
+            });
+        programs
     }
 }
