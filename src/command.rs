@@ -28,6 +28,7 @@ impl FromStr for Command {
                     if path_programs.contains_key(param.as_str()) {
                         Ok(Command {
                             execution: Box::new(move || {
+                                println!("{:#?}", path_programs);
                                 println!(
                                     "{} is {}",
                                     param,
@@ -64,7 +65,7 @@ impl Command {
             .flatten()
             .for_each(|entry| {
                 let entry = entry.unwrap();
-                if entry.file_type().unwrap().is_file() {
+                if entry.file_type().unwrap().is_file() && !programs.contains_key(entry.file_name().to_string_lossy().as_ref()) {
                     let file_name = entry.file_name().into_string().unwrap();
                     let file_path = entry.path().to_string_lossy().to_string();
                     programs.insert(file_name, file_path);
