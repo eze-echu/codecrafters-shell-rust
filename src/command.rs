@@ -28,7 +28,7 @@ impl FromStr for Command {
                     if path_programs.contains_key(param.as_str()) {
                         Ok(Command {
                             execution: Box::new(move || {
-                                println!("{:#?}", path_programs);
+                                // println!("{:#?}", path_programs);
                                 println!(
                                     "{} is {}",
                                     param,
