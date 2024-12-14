@@ -61,9 +61,11 @@ impl Command {
             .flatten()
             .for_each(|entry| {
                 let entry = entry.unwrap();
-                let file_name = entry.file_name().into_string().unwrap();
-                let file_path = entry.path().to_string_lossy().to_string();
-                programs.insert(file_name, file_path);
+                if entry.file_type().unwrap().is_file() {
+                    let file_name = entry.file_name().into_string().unwrap();
+                    let file_path = entry.path().to_string_lossy().to_string();
+                    programs.insert(file_name, file_path);
+                }
             });
         programs
     }
