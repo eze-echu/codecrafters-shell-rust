@@ -19,24 +19,27 @@ impl FromStr for Command {
                 execution: Box::new(move || println!("{}", param)),
             }),
             "type" => {
-                if param.is_empty() || param != "exit" && param != "echo" && param != "type" {
-                    Ok(Command {
-                        execution: Box::new(move || println!("{}: not found", param)),
-                    })
-                } else if Command::programs_on_path().contains_key(param.as_str()) {
-                    Ok(Command {
-                        execution: Box::new(move || {
-                            println!(
-                                "{} is {}",
-                                param,
-                                Command::programs_on_path().get(param.as_str()).unwrap()
-                            )
-                        }),
-                    })
-                } else {
+                if !param.is_empty() && (param == "exit" || param == "echo" || param == "type") {
                     Ok(Command {
                         execution: Box::new(move || println!("{} is a shell builtin", param)),
                     })
+                } else {
+                    let path_programs = Command::programs_on_path();
+                    if path_programs.contains_key(param.as_str()) {
+                        Ok(Command {
+                            execution: Box::new(move || {
+                                println!(
+                                    "{} is {}",
+                                    param,
+                                    path_programs.get(param.as_str()).unwrap()
+                                )
+                            }),
+                        })
+                    } else {
+                        Ok(Command {
+                            execution: Box::new(move || println!("{}: not found", param)),
+                        })
+                    }
                 }
             }
             _ => {
