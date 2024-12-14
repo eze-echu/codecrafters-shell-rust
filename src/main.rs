@@ -11,7 +11,11 @@ fn main() {
         let stdin = io::stdin();
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
-        match input {
+        let separated_input: Vec<&str> = input.split_whitespace().collect();
+        match separated_input[0] {
+            "exit" => {
+                std::process::exit(0);
+            }
             _ => {
                 println!("{}: command not found", input.trim());
             }
