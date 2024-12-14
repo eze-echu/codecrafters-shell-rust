@@ -1,5 +1,9 @@
+mod command;
+use command::*;
+
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::str::FromStr;
 
 fn main() {
     // Uncomment this block to pass the first stage
@@ -11,17 +15,22 @@ fn main() {
         let stdin = io::stdin();
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
-        let separated_input: Vec<&str> = input.split_whitespace().collect();
-        match separated_input[0] {
-            "exit" => {
-                std::process::exit(0);
-            }
-            "echo" => {
-                println!("{}", separated_input[1..].join(" "));
-            }
-            _ => {
-                println!("{}: command not found", input.trim());
-            }
+        match Command::from_str(input.trim()) {
+            Ok(command) => command.execute(),
+            Err(e) => eprintln!("{}", e),
         }
+        // let separated_input: Vec<&str> = input.split_whitespace().collect();
+        // match separated_input[0] {
+        //     "exit" => {
+        //         Command::Echo(separated_input[1..].iter().map(|s| s.to_string()).collect());
+        //         std::process::exit(0);
+        //     }
+        //     "echo" => {
+        //         println!("{}", separated_input[1..].join(" "));
+        //     }
+        //     _ => {
+        //         println!("{}: command not found", input.trim());
+        //     }
+        // }
     }
 }
