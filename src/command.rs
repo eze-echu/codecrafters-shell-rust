@@ -21,7 +21,7 @@ impl FromStr for Command {
             "type" => {
                 if param.is_empty() || param != "exit" && param != "echo" && param != "type" {
                     Ok(Command {
-                        execution: Box::new(move || println!("{}: command not found", param)),
+                        execution: Box::new(move || println!("{}: not found", param)),
                     })
                 } else {
                     Ok(Command {
