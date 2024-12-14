@@ -16,6 +16,9 @@ fn main() {
             "exit" => {
                 std::process::exit(0);
             }
+            "echo" => {
+                println!("{}", separated_input[1..].join(" "));
+            }
             _ => {
                 println!("{}: command not found", input.trim());
             }
