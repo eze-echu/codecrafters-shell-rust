@@ -44,10 +44,26 @@ impl FromStr for Command {
                 }
             }
             _ => {
-                let command_name = command.to_string();
-                Ok(Command {
-                    execution: Box::new(move || println!("{}: command not found", command_name)),
-                })
+                let path_programs = Command::programs_on_path();
+                if path_programs.contains_key(command) {
+                    let command = command.trim().to_string();
+                    Ok(Command {
+                        execution: Box::new(move || {
+                            let stdout = String::from_utf8(std::process::Command::new(command)
+                                .args(param.split_ascii_whitespace())
+                                .spawn()
+                                .unwrap().wait_with_output().unwrap().stdout).unwrap();
+                            print!("{}", stdout);
+                        }),
+                    })
+                } else {
+                    let command_name = command.to_string();
+                    Ok(Command {
+                        execution: Box::new(move || {
+                            println!("{}: command not found", command_name)
+                        }),
+                    })
+                }
             }
         }
     }
@@ -65,7 +81,9 @@ impl Command {
             .flatten()
             .for_each(|entry| {
                 let entry = entry.unwrap();
-                if entry.file_type().unwrap().is_file() && !programs.contains_key(entry.file_name().to_string_lossy().as_ref()) {
+                if entry.file_type().unwrap().is_file()
+                    && !programs.contains_key(entry.file_name().to_string_lossy().as_ref())
+                {
                     let file_name = entry.file_name().into_string().unwrap();
                     let file_path = entry.path().to_string_lossy().to_string();
                     programs.insert(file_name, file_path);
