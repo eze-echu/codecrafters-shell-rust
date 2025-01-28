@@ -1,4 +1,6 @@
 use std::error::Error;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 pub struct Command {
@@ -42,6 +44,16 @@ impl FromStr for Command {
                         })
                     }
                 }
+            }
+            "cwd" => {
+                let real_path = fs::canonicalize(Path::new("."))
+                    .expect("Failed to get current working directory");
+                let str_path = real_path.into_os_string();
+                Ok(Command {
+                    execution: Box::new( move || {
+                        println!("{:?}", str_path);
+                    })
+                })
             }
             _ => {
                 let path_programs = Command::programs_on_path();
