@@ -59,10 +59,14 @@ impl FromStr for Command {
                 })
             }
             "cd" => {
+                if param.is_empty() {
+                    return Err("cd: missing argument".into());
+                }
                 if param.split(' ').count() > 1 {
                     return Err("cd: too many arguments".into());
                 }
-                let path = PathBuf::from(&param);
+                let str_path = param.replace("~", std::env::var("HOME").unwrap().as_str());
+                let path = PathBuf::from(&str_path);
                 if path.try_exists()?{
                     Ok(Command {
                         execution: Box::new(move || {
