@@ -21,7 +21,10 @@ impl FromStr for Command {
                 execution: Box::new(move || println!("{}", param)),
             }),
             "type" => {
-                if !param.is_empty() && (param == "exit" || param == "echo" || param == "type" || param == "pwd") {
+                if param.is_empty() {
+                    return Err("type: missing argument".into());
+                }
+                if !param.is_empty() && (param == "exit" || param == "echo" || param == "type" || param == "pwd" || param == "cd") {
                     Ok(Command {
                         execution: Box::new(move || println!("{} is a shell builtin", param)),
                     })
@@ -54,6 +57,22 @@ impl FromStr for Command {
                         println!("{}", str_path.to_str().unwrap());
                     })
                 })
+            }
+            "cd" => {
+                if param.split(' ').count() > 1 {
+                    return Err("cd: too many arguments".into());
+                }
+                let path = PathBuf::from(&param);
+                if path.try_exists()?{
+                    Ok(Command {
+                        execution: Box::new(move || {
+                            std::env::set_current_dir(path).expect("Failed to change directory");
+                        }),
+                    })
+                }
+                else {
+                    Err(format!("cd: {}: No such file or directory", param).into())
+                }
             }
             _ => {
                 let path_programs = Command::programs_on_path();
