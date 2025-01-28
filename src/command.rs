@@ -21,7 +21,7 @@ impl FromStr for Command {
                 execution: Box::new(move || println!("{}", param)),
             }),
             "type" => {
-                if !param.is_empty() && (param == "exit" || param == "echo" || param == "type" || param == "cwd") {
+                if !param.is_empty() && (param == "exit" || param == "echo" || param == "type" || param == "pwd") {
                     Ok(Command {
                         execution: Box::new(move || println!("{} is a shell builtin", param)),
                     })
@@ -45,13 +45,13 @@ impl FromStr for Command {
                     }
                 }
             }
-            "cwd" => {
+            "pwd" => {
                 let real_path = fs::canonicalize(Path::new("."))
                     .expect("Failed to get current working directory");
                 let str_path = real_path.into_os_string();
                 Ok(Command {
                     execution: Box::new( move || {
-                        println!("{:?}", str_path);
+                        println!("{}", str_path.to_str().unwrap());
                     })
                 })
             }
