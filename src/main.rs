@@ -1,6 +1,7 @@
 mod command;
 use command::*;
 
+use anyhow::Context;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -14,7 +15,9 @@ fn main() {
         // Wait for user input
         let stdin = io::stdin();
         let mut input = String::new();
-        stdin.read_line(&mut input).unwrap();
+        let _ = stdin
+            .read_line(&mut input)
+            .with_context(|| "failed to read input");
         match Command::from_str(input.trim()) {
             Ok(command) => command.execute(),
             Err(e) => eprintln!("{}", e),
