@@ -1,4 +1,9 @@
+use anyhow::Error;
+use std::borrow::Cow;
+use std::fmt::DebugList;
 use std::fs;
+use std::io::BufRead;
+use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -19,7 +24,7 @@ const BUILTINS: &[&str] = &["type", "exit", "echo", "cd", "pwd"];
 pub struct Command {
     execution: Box<dyn FnOnce()>,
 }
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 enum CommandError {
     #[error("{command}: missing argument.")]
     MissingOnlyArgument { command: String },
@@ -40,13 +45,17 @@ impl FromStr for Command {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (command, param) = s.split_at(s.find(' ').unwrap_or(s.len()));
         let param = param.trim().to_string();
+
+        let mut test_param = Self::parse_param(&param).unwrap();
+
+        //println!("{:#?}", test_param);
         match command {
             "exit" => Ok(Command {
                 execution: Box::new(move || {
                     std::process::exit(i32::from_str(param.as_str()).unwrap_or(0))
                 }),
             }),
-            "echo" => Ok(echo(param)),
+            "echo" => Ok(echo(test_param[0].clone())),
             "type" => type_func_command(param),
             "pwd" => pwd(),
             "cd" => cd(param),
@@ -101,5 +110,102 @@ impl Command {
                 }
             });
         programs
+    }
+    fn parse_param(param: &str) -> Result<Vec<String>, anyhow::Error> {
+        let mut quotations = Quotations {
+            single_quote: false,
+            double_quote: false,
+            braces: false,
+            parenthesis: false,
+            backtick: false,
+            buffer: String::default(),
+        };
+
+        let mut groups: Vec<String> = vec![];
+
+        let trimmed_param = param.trim();
+        if trimmed_param.is_empty() {
+            return Err(anyhow::anyhow!("parameter is empty"));
+        }
+        for i in 0..trimmed_param.len() {
+            let param_char = trimmed_param.chars().nth(i).unwrap();
+
+            // TODO: Make function to handle checking
+            match param_char {
+                '\'' => {
+                    if quotations.single_quote {
+                        quotations.single_quote = false;
+                        groups.push(quotations.buffer());
+                        quotations.buffer_clear();
+                        // quotations.buffer_push(param_char);
+                    } else if quotations.is_already_inside_quotations() {
+                        quotations.buffer_push(param_char);
+                    } else {
+                        quotations.single_quote = true;
+                        groups.push(quotations.buffer());
+                        quotations.buffer_clear();
+                    }
+                }
+                '"' => {
+                    if quotations.double_quote {
+                        quotations.double_quote = false;
+                        groups.push(quotations.buffer());
+                        quotations.buffer_clear();
+                        quotations.buffer_push(param_char);
+                    } else if quotations.is_already_inside_quotations() {
+                        quotations.buffer.push(param_char);
+                    } else {
+                        quotations.double_quote = true;
+                        groups.push(quotations.buffer());
+                        quotations.buffer_clear();
+                    }
+                }
+                '`' => {
+                    if quotations.backtick {
+                        quotations.single_quote = false;
+                        groups.push(quotations.buffer());
+                        quotations.buffer_clear();
+                        //quotations.buffer_push(param_char);
+                    } else if quotations.is_already_inside_quotations() {
+                        quotations.buffer_push(param_char);
+                    } else {
+                        quotations.backtick = true;
+                        groups.push(quotations.buffer());
+                        quotations.buffer_clear();
+                    }
+                }
+                _ => {
+                    quotations.buffer_push(param_char);
+                }
+            }
+        }
+        Ok(groups.into_iter().filter(|s| !s.is_empty()).collect::<Vec<String>>())
+    }
+}
+
+struct Quotations {
+    pub single_quote: bool,
+    pub double_quote: bool,
+    pub braces: bool,
+    pub parenthesis: bool,
+    pub backtick: bool,
+    buffer: String,
+}
+
+impl Quotations {
+    fn is_already_inside_quotations(&self) -> bool {
+        self.single_quote || self.double_quote || self.braces || self.parenthesis || self.backtick
+    }
+
+    fn buffer_push(&mut self, param_char: char) {
+        self.buffer.push(param_char);
+    }
+
+    fn buffer_clear(&mut self){
+        self.buffer.clear();
+    }
+
+    fn buffer(&self) -> String {
+        self.buffer.clone()
     }
 }
