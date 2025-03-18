@@ -46,7 +46,7 @@ impl FromStr for Command {
         let (command, param) = s.split_at(s.find(' ').unwrap_or(s.len()));
         let param = param.trim().to_string();
 
-        let mut test_param = Self::parse_param(&param).unwrap();
+        let test_param = Self::parse_param(&param)?;
 
         //println!("{:#?}", test_param);
         match command {
@@ -56,9 +56,9 @@ impl FromStr for Command {
                 }),
             }),
             "echo" => Ok(echo(test_param.join(""))),
-            "type" => type_func_command(param),
+            "type" => type_func_command(test_param[0].to_owned()),
             "pwd" => pwd(),
-            "cd" => cd(param),
+            "cd" => cd(test_param.join("")),
             _ => {
                 let path_programs = Command::programs_on_path();
                 if path_programs.contains_key(command) {
@@ -67,7 +67,7 @@ impl FromStr for Command {
                         execution: Box::new(move || {
                             let stdout = String::from_utf8(
                                 std::process::Command::new(command)
-                                    .args(param.split_ascii_whitespace())
+                                    .args(test_param)
                                     .spawn()
                                     .unwrap()
                                     .wait_with_output()
@@ -126,7 +126,7 @@ impl Command {
 
         let trimmed_param = param.trim();
         if trimmed_param.is_empty() {
-            return Err(anyhow::anyhow!("parameter is empty"));
+            return Ok(vec![])
         }
         for i in 0..trimmed_param.len() {
             let param_char = trimmed_param.chars().nth(i).unwrap();
