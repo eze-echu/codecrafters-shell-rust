@@ -132,104 +132,13 @@ impl Command {
         if trimmed_param.is_empty() {
             return Ok(vec![]);
         }
-        for i in 0..trimmed_param.len() {
-            let param_char = trimmed_param.chars().nth(i).unwrap();
-
-            // TODO: Make function to handle checking
+        for param_char in trimmed_param.chars() {
             match param_char {
-                '\'' => {
-                    if quotations.escaped {
-                        quotations.buffer_push(param_char);
-                        quotations.escaped = false;
-                    } else if quotations.single_quote {
-                        quotations.single_quote = false;
-                        groups.push(quotations.buffer());
-                        quotations.buffer_clear();
-                        // quotations.buffer_push(param_char);
-                    } else if quotations.is_already_inside_quotations() {
-                        quotations.buffer_push(param_char);
-                    } else {
-                        quotations.single_quote = true;
-                        if !quotations.single_quote {
-                            if !quotations.buffer.is_empty()
-                                && quotations.buffer_single_whitespace() == ""
-                            {
-                                quotations.buffer = ' '.to_string();
-                            } else {
-                                quotations.buffer = quotations.buffer_single_whitespace();
-                            }
-                        }
-                        groups.push(quotations.buffer());
-                        quotations.buffer_clear();
-                    }
-                }
-                '"' => {
-                    if quotations.escaped {
-                        quotations.buffer_push(param_char);
-                        quotations.escaped = false;
-                    } else if quotations.double_quote {
-                        quotations.double_quote = false;
-                        groups.push(quotations.buffer());
-                        quotations.buffer_clear();
-                        //quotations.buffer_push(param_char);
-                    } else if quotations.is_already_inside_quotations() {
-                        quotations.buffer.push(param_char);
-                    } else {
-                        quotations.double_quote = true;
-                        if !quotations.single_quote {
-                            if !quotations.buffer.is_empty()
-                                && quotations.buffer_single_whitespace() == ""
-                            {
-                                quotations.buffer = ' '.to_string();
-                            } else {
-                                quotations.buffer = quotations.buffer_single_whitespace();
-                            }
-                        }
-                        groups.push(quotations.buffer());
-                        quotations.buffer_clear();
-                    }
-                }
-                '`' => {
-                    if quotations.escaped {
-                        quotations.buffer_push(param_char);
-                        quotations.escaped = false;
-                    } else if quotations.backtick {
-                        quotations.single_quote = false;
-                        groups.push(quotations.buffer());
-                        quotations.buffer_clear();
-                        //quotations.buffer_push(param_char);
-                    } else if quotations.is_already_inside_quotations() {
-                        quotations.buffer_push(param_char);
-                    } else {
-                        quotations.backtick = true;
-                        if !quotations.single_quote {
-                            if !quotations.buffer.is_empty()
-                                && quotations.buffer_single_whitespace() == ""
-                            {
-                                quotations.buffer = ' '.to_string();
-                            } else {
-                                quotations.buffer = quotations.buffer_single_whitespace();
-                            }
-                        }
-                        groups.push(quotations.buffer());
-                        quotations.buffer_clear();
-                    }
-                }
-                '\\' => {
-                    if quotations.single_quote
-                        || (quotations.escaped && quotations.is_already_inside_quotations())
-                    {
-                        quotations.buffer_push(param_char);
-                    }
-                    quotations.escaped = true;
-                }
-                _ => {
-                    if param_char.is_whitespace() {
-                        quotations.buffer_push(' ');
-                    } else {
-                        quotations.buffer_push(param_char);
-                    }
-                }
+                '\'' => handle_single_quote(&mut quotations, &mut groups),
+                '"' => handle_double_quote(&mut quotations, &mut groups),
+                '`' => handle_backtick(&mut quotations, &mut groups),
+                '\\' => handle_escape(&mut quotations),
+                _ => handle_other_chars(&mut quotations, param_char),
             }
         }
         if !quotations.buffer.is_empty() {
@@ -239,6 +148,97 @@ impl Command {
             .into_iter()
             .filter(|s| !s.is_empty())
             .collect::<Vec<String>>())
+    }
+}
+fn handle_single_quote(quotations: &mut Quotations, groups: &mut Vec<String>) {
+    if quotations.escaped {
+        quotations.buffer_push('\'');
+        quotations.escaped = false;
+    } else if quotations.single_quote {
+        quotations.single_quote = false;
+        groups.push(quotations.buffer());
+        quotations.buffer_clear();
+    } else if quotations.is_already_inside_quotations() {
+        quotations.buffer_push('\'');
+    } else {
+        quotations.single_quote = true;
+        if !quotations.single_quote {
+            if !quotations.buffer.is_empty() && quotations.buffer_single_whitespace().is_empty() {
+                quotations.buffer = ' '.to_string();
+            } else {
+                quotations.buffer = quotations.buffer_single_whitespace();
+            }
+        }
+        groups.push(quotations.buffer());
+        quotations.buffer_clear();
+    }
+}
+
+fn handle_double_quote(quotations: &mut Quotations, groups: &mut Vec<String>) {
+    if quotations.escaped {
+        quotations.buffer_push('"');
+        quotations.escaped = false;
+    } else if quotations.double_quote {
+        quotations.double_quote = false;
+        groups.push(quotations.buffer());
+        quotations.buffer_clear();
+    } else if quotations.is_already_inside_quotations() {
+        quotations.buffer.push('"');
+    } else {
+        quotations.double_quote = true;
+        if !quotations.single_quote {
+            if !quotations.buffer.is_empty() && quotations.buffer_single_whitespace().is_empty() {
+                quotations.buffer = ' '.to_string();
+            } else {
+                quotations.buffer = quotations.buffer_single_whitespace();
+            }
+        }
+        groups.push(quotations.buffer());
+        quotations.buffer_clear();
+    }
+}
+
+fn handle_backtick(quotations: &mut Quotations, groups: &mut Vec<String>) {
+    if quotations.escaped {
+        quotations.buffer_push('`');
+        quotations.escaped = false;
+    } else if quotations.backtick {
+        quotations.single_quote = false;
+        groups.push(quotations.buffer());
+        quotations.buffer_clear();
+    } else if quotations.is_already_inside_quotations() {
+        quotations.buffer_push('`');
+    } else {
+        quotations.backtick = true;
+        if !quotations.single_quote {
+            if !quotations.buffer.is_empty() && quotations.buffer_single_whitespace().is_empty() {
+                quotations.buffer = ' '.to_string();
+            } else {
+                quotations.buffer = quotations.buffer_single_whitespace();
+            }
+        }
+        groups.push(quotations.buffer());
+        quotations.buffer_clear();
+    }
+}
+
+fn handle_escape(quotations: &mut Quotations) {
+    if quotations.single_quote || (quotations.escaped && quotations.is_already_inside_quotations())
+    {
+        quotations.buffer_push('\\');
+    }
+    quotations.escaped = true;
+}
+
+fn handle_other_chars(quotations: &mut Quotations, param_char: char) {
+    if quotations.escaped {
+        quotations.buffer_push(param_char);
+        quotations.escaped = false;
+    }
+    if param_char.is_whitespace() {
+        quotations.buffer_push(' ');
+    } else {
+        quotations.buffer_push(param_char);
     }
 }
 
