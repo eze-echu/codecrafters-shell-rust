@@ -55,7 +55,7 @@ impl FromStr for Command {
                     std::process::exit(i32::from_str(param.as_str()).unwrap_or(0))
                 }),
             }),
-            "echo" => Ok(echo(test_param[0].clone())),
+            "echo" => Ok(echo(test_param.join(""))),
             "type" => type_func_command(param),
             "pwd" => pwd(),
             "cd" => cd(param),
@@ -160,7 +160,7 @@ impl Command {
                         quotations.double_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
-                        quotations.buffer_push(param_char);
+                        //quotations.buffer_push(param_char);
                     } else if quotations.is_already_inside_quotations() {
                         quotations.buffer.push(param_char);
                     } else {
@@ -197,6 +197,9 @@ impl Command {
                     quotations.buffer_push(param_char);
                 }
             }
+        }
+        if !quotations.buffer.is_empty() {
+            groups.push(quotations.buffer);
         }
         Ok(groups.into_iter().filter(|s| !s.is_empty()).collect::<Vec<String>>())
     }
