@@ -199,7 +199,8 @@ impl Command {
             }
         }
         if !quotations.buffer.is_empty() {
-            groups.push(quotations.buffer);
+            let a = quotations.buffer.split_whitespace().collect::<Vec<&str>>().join(" ");
+            groups.push(a);
         }
         Ok(groups.into_iter().filter(|s| !s.is_empty()).collect::<Vec<String>>())
     }
