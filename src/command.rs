@@ -74,7 +74,7 @@ impl FromStr for Command {
                                     .unwrap()
                                     .stdout,
                             )
-                            .unwrap();
+                                .unwrap();
                             print!("{}", stdout);
                         }),
                     })
@@ -82,7 +82,7 @@ impl FromStr for Command {
                     Err(CommandError::NotFound {
                         command: command.to_string(),
                     }
-                    .into())
+                        .into())
                 }
             }
         }
@@ -118,6 +118,7 @@ impl Command {
             braces: false,
             parenthesis: false,
             backtick: false,
+            escaped: false,
             buffer: String::default(),
         };
 
@@ -133,7 +134,11 @@ impl Command {
             // TODO: Make function to handle checking
             match param_char {
                 '\'' => {
-                    if quotations.single_quote {
+                    if quotations.escaped {
+                        quotations.buffer_push(param_char);
+                        quotations.escaped = false;
+                    }
+                    else if quotations.single_quote {
                         quotations.single_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
@@ -147,7 +152,11 @@ impl Command {
                     }
                 }
                 '"' => {
-                    if quotations.double_quote {
+                    if quotations.escaped {
+                        quotations.buffer_push(param_char);
+                        quotations.escaped = false;
+                    }
+                    else if quotations.double_quote {
                         quotations.double_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
@@ -161,7 +170,11 @@ impl Command {
                     }
                 }
                 '`' => {
-                    if quotations.backtick {
+                    if quotations.escaped {
+                        quotations.buffer_push(param_char);
+                        quotations.escaped = false;
+                    }
+                    else if quotations.backtick {
                         quotations.single_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
@@ -173,6 +186,12 @@ impl Command {
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
                     }
+                }
+                '\\' => {
+                    if quotations.single_quote || (quotations.escaped && quotations.is_already_inside_quotations()){
+                        quotations.buffer_push(param_char);
+                    }
+                    quotations.escaped = true;
                 }
                 _ => {
                     quotations.buffer_push(param_char);
@@ -189,6 +208,7 @@ struct Quotations {
     pub braces: bool,
     pub parenthesis: bool,
     pub backtick: bool,
+    pub escaped: bool,
     buffer: String,
 }
 
