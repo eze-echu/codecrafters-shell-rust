@@ -32,13 +32,13 @@ enum CommandError {
     TooManyArguments { command: String },
     #[error("{command}: too few arguments.")]
     TooFewArguments { command: String },
-    #[error("{command}: {destination}: No such file or directory.")]
+    #[error("{command}: {destination}: No such file or directory")]
     MissingFileOrDirectory {
         command: String,
         destination: String,
     },
-    #[error("{command}: not found.")]
-    NotFound { command: String },
+    #[error("{command}: command not found")]
+    CommandNotFound { command: String },
 }
 impl FromStr for Command {
     type Err = anyhow::Error;
@@ -47,8 +47,7 @@ impl FromStr for Command {
         let param = param.trim().to_string();
 
         let test_param = Self::parse_param(&param)?;
-
-        //println!("{:#?}", test_param);
+        
         match command {
             "exit" => Ok(Command {
                 execution: Box::new(move || {
@@ -67,7 +66,7 @@ impl FromStr for Command {
                         execution: Box::new(move || {
                             let stdout = String::from_utf8(
                                 std::process::Command::new(command)
-                                    .args(test_param)
+                                    .args(test_param.iter().filter(|&arg| !arg.is_empty() && arg != " ").collect::<Vec<&String>>())
                                     .spawn()
                                     .unwrap()
                                     .wait_with_output()
@@ -79,7 +78,7 @@ impl FromStr for Command {
                         }),
                     })
                 } else {
-                    Err(CommandError::NotFound {
+                    Err(CommandError::CommandNotFound {
                         command: command.to_string(),
                     }
                         .into())
@@ -126,7 +125,7 @@ impl Command {
 
         let trimmed_param = param.trim();
         if trimmed_param.is_empty() {
-            return Ok(vec![])
+            return Ok(vec![]);
         }
         for i in 0..trimmed_param.len() {
             let param_char = trimmed_param.chars().nth(i).unwrap();
@@ -137,8 +136,7 @@ impl Command {
                     if quotations.escaped {
                         quotations.buffer_push(param_char);
                         quotations.escaped = false;
-                    }
-                    else if quotations.single_quote {
+                    } else if quotations.single_quote {
                         quotations.single_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
@@ -155,8 +153,7 @@ impl Command {
                     if quotations.escaped {
                         quotations.buffer_push(param_char);
                         quotations.escaped = false;
-                    }
-                    else if quotations.double_quote {
+                    } else if quotations.double_quote {
                         quotations.double_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
@@ -173,8 +170,7 @@ impl Command {
                     if quotations.escaped {
                         quotations.buffer_push(param_char);
                         quotations.escaped = false;
-                    }
-                    else if quotations.backtick {
+                    } else if quotations.backtick {
                         quotations.single_quote = false;
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
@@ -188,7 +184,9 @@ impl Command {
                     }
                 }
                 '\\' => {
-                    if quotations.single_quote || (quotations.escaped && quotations.is_already_inside_quotations()){
+                    if quotations.single_quote
+                        || (quotations.escaped && quotations.is_already_inside_quotations())
+                    {
                         quotations.buffer_push(param_char);
                     }
                     quotations.escaped = true;
@@ -199,10 +197,17 @@ impl Command {
             }
         }
         if !quotations.buffer.is_empty() {
-            let a = quotations.buffer.split_whitespace().collect::<Vec<&str>>().join(" ");
+            let a = quotations
+                .buffer
+                .split_whitespace()
+                .collect::<Vec<&str>>()
+                .join(" ");
             groups.push(a);
         }
-        Ok(groups.into_iter().filter(|s| !s.is_empty()).collect::<Vec<String>>())
+        Ok(groups
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<String>>())
     }
 }
 
@@ -225,7 +230,7 @@ impl Quotations {
         self.buffer.push(param_char);
     }
 
-    fn buffer_clear(&mut self){
+    fn buffer_clear(&mut self) {
         self.buffer.clear();
     }
 
