@@ -47,7 +47,7 @@ impl FromStr for Command {
         let param = param.trim().to_string();
 
         let test_param = Self::parse_param(&param)?;
-        
+        //println!("{:?}", test_param);
         match command {
             "exit" => Ok(Command {
                 execution: Box::new(move || {
@@ -66,7 +66,12 @@ impl FromStr for Command {
                         execution: Box::new(move || {
                             let stdout = String::from_utf8(
                                 std::process::Command::new(command)
-                                    .args(test_param.iter().filter(|&arg| !arg.is_empty() && arg != " ").collect::<Vec<&String>>())
+                                    .args(
+                                        test_param
+                                            .iter()
+                                            .filter(|&arg| !arg.is_empty() && arg != " ")
+                                            .collect::<Vec<&String>>(),
+                                    )
                                     .spawn()
                                     .unwrap()
                                     .wait_with_output()
@@ -145,6 +150,15 @@ impl Command {
                         quotations.buffer_push(param_char);
                     } else {
                         quotations.single_quote = true;
+                        if !quotations.single_quote {
+                            if !quotations.buffer.is_empty()
+                                && quotations.buffer_single_whitespace() == ""
+                            {
+                                quotations.buffer = ' '.to_string();
+                            } else {
+                                quotations.buffer = quotations.buffer_single_whitespace();
+                            }
+                        }
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
                     }
@@ -162,6 +176,15 @@ impl Command {
                         quotations.buffer.push(param_char);
                     } else {
                         quotations.double_quote = true;
+                        if !quotations.single_quote {
+                            if !quotations.buffer.is_empty()
+                                && quotations.buffer_single_whitespace() == ""
+                            {
+                                quotations.buffer = ' '.to_string();
+                            } else {
+                                quotations.buffer = quotations.buffer_single_whitespace();
+                            }
+                        }
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
                     }
@@ -179,6 +202,15 @@ impl Command {
                         quotations.buffer_push(param_char);
                     } else {
                         quotations.backtick = true;
+                        if !quotations.single_quote {
+                            if !quotations.buffer.is_empty()
+                                && quotations.buffer_single_whitespace() == ""
+                            {
+                                quotations.buffer = ' '.to_string();
+                            } else {
+                                quotations.buffer = quotations.buffer_single_whitespace();
+                            }
+                        }
                         groups.push(quotations.buffer());
                         quotations.buffer_clear();
                     }
@@ -192,17 +224,16 @@ impl Command {
                     quotations.escaped = true;
                 }
                 _ => {
-                    quotations.buffer_push(param_char);
+                    if param_char.is_whitespace() {
+                        quotations.buffer_push(' ');
+                    } else {
+                        quotations.buffer_push(param_char);
+                    }
                 }
             }
         }
         if !quotations.buffer.is_empty() {
-            let a = quotations
-                .buffer
-                .split_whitespace()
-                .collect::<Vec<&str>>()
-                .join(" ");
-            groups.push(a);
+            groups.push(quotations.buffer_single_whitespace());
         }
         Ok(groups
             .into_iter()
@@ -236,5 +267,12 @@ impl Quotations {
 
     fn buffer(&self) -> String {
         self.buffer.clone()
+    }
+
+    fn buffer_single_whitespace(&self) -> String {
+        self.buffer
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ")
     }
 }
