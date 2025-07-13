@@ -1,9 +1,4 @@
-use anyhow::Error;
-use std::borrow::Cow;
-use std::fmt::DebugList;
 use std::fs;
-use std::io::BufRead;
-use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -39,46 +34,39 @@ enum CommandError {
     },
     #[error("{command}: command not found")]
     CommandNotFound { command: String },
+    #[error("{command}: parsing error")]
+    ParsingError { command: String },
 }
 impl FromStr for Command {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (command, param) = s.split_at(s.find(' ').unwrap_or(s.len()));
         let param = param.trim().to_string();
-
-        let test_param = Self::parse_param(&param)?;
-        //println!("{:?}", test_param);
         match command {
             "exit" => Ok(Command {
                 execution: Box::new(move || {
                     std::process::exit(i32::from_str(param.as_str()).unwrap_or(0))
                 }),
             }),
-            "echo" => Ok(echo(test_param.join(""))),
-            "type" => type_func_command(test_param[0].to_owned()),
+            "echo" => Ok(echo(param)),
+            "type" => type_func_command(param),
             "pwd" => pwd(),
-            "cd" => cd(test_param.join("")),
+            "cd" => cd(param),
             _ => {
-                let path_programs = Command::programs_on_path();
-                if path_programs.contains_key(command) {
+                if Self::binary_exists_on_path(command) {
                     let command = command.trim().to_string();
                     Ok(Command {
                         execution: Box::new(move || {
                             let stdout = String::from_utf8(
                                 std::process::Command::new(command)
-                                    .args(
-                                        test_param
-                                            .iter()
-                                            .filter(|&arg| !arg.is_empty() && arg != " ")
-                                            .collect::<Vec<&String>>(),
-                                    )
+                                    .args(param.split_ascii_whitespace())
                                     .spawn()
                                     .unwrap()
                                     .wait_with_output()
                                     .unwrap()
                                     .stdout,
                             )
-                                .unwrap();
+                            .unwrap();
                             print!("{}", stdout);
                         }),
                     })
@@ -86,7 +74,7 @@ impl FromStr for Command {
                     Err(CommandError::CommandNotFound {
                         command: command.to_string(),
                     }
-                        .into())
+                    .into())
                 }
             }
         }
@@ -96,8 +84,15 @@ impl Command {
     pub fn execute(self) {
         (self.execution)();
     }
-    fn programs_on_path() -> std::collections::HashMap<String, String> {
-        let mut programs = std::collections::HashMap::new();
+    #[cfg(target_os = "linux")]
+    /// # source_path
+    ///
+    /// ## Description
+    /// Linux-specific function to retrieve all executable programs available in the system's PATH.
+    /// ## Returns
+    /// - binaries_found: HashMap<String, String>, where the key is the program name and the value is its full path.
+    fn source_path() -> std::collections::HashMap<String, String> {
+        let mut binaries_found = std::collections::HashMap::new();
         std::env::var("PATH")
             .unwrap_or_else(|_| "/bin:/usr/bin".to_string())
             .split(':')
@@ -106,173 +101,30 @@ impl Command {
             .for_each(|entry| {
                 let entry = entry.unwrap();
                 if entry.file_type().unwrap().is_file()
-                    && !programs.contains_key(entry.file_name().to_string_lossy().as_ref())
+                    && !binaries_found.contains_key(entry.file_name().to_string_lossy().as_ref())
                 {
                     let file_name = entry.file_name().into_string().unwrap();
                     let file_path = entry.path().to_string_lossy().to_string();
-                    programs.insert(file_name, file_path);
+                    binaries_found.insert(file_name, file_path);
                 }
             });
-        programs
+        binaries_found
     }
-    fn parse_param(param: &str) -> Result<Vec<String>, anyhow::Error> {
-        let mut quotations = Quotations {
-            single_quote: false,
-            double_quote: false,
-            braces: false,
-            parenthesis: false,
-            backtick: false,
-            escaped: false,
-            buffer: String::default(),
+    fn binary_exists_on_path(bin: &str) -> bool {
+        let program_exists = if cfg!(target_os = "linux") {
+            let path_programs = Command::source_path();
+            path_programs.contains_key(bin)
+        } else if cfg!(target_os = "windows") {
+            // On Windows, we can use the `where` command to check for executables
+            let path = std::env::var_os("PATH");
+            if let Some(item) = path {
+                item.to_string_lossy().find(bin).is_some()
+            } else {
+                false
+            }
+        } else {
+            false
         };
-
-        let mut groups: Vec<String> = vec![];
-
-        let trimmed_param = param.trim();
-        if trimmed_param.is_empty() {
-            return Ok(vec![]);
-        }
-        for param_char in trimmed_param.chars() {
-            match param_char {
-                '\'' => handle_single_quote(&mut quotations, &mut groups),
-                '"' => handle_double_quote(&mut quotations, &mut groups),
-                '`' => handle_backtick(&mut quotations, &mut groups),
-                '\\' => handle_escape(&mut quotations),
-                _ => handle_other_chars(&mut quotations, param_char),
-            }
-        }
-        if !quotations.buffer.is_empty() {
-            groups.push(quotations.buffer_single_whitespace());
-        }
-        Ok(groups
-            .into_iter()
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<String>>())
-    }
-}
-fn handle_single_quote(quotations: &mut Quotations, groups: &mut Vec<String>) {
-    if quotations.escaped {
-        quotations.buffer_push('\'');
-        quotations.escaped = false;
-    } else if quotations.single_quote {
-        quotations.single_quote = false;
-        groups.push(quotations.buffer());
-        quotations.buffer_clear();
-    } else if quotations.is_already_inside_quotations() {
-        quotations.buffer_push('\'');
-    } else {
-        quotations.single_quote = true;
-        if !quotations.single_quote {
-            if !quotations.buffer.is_empty() && quotations.buffer_single_whitespace().is_empty() {
-                quotations.buffer = ' '.to_string();
-            } else {
-                quotations.buffer = quotations.buffer_single_whitespace();
-            }
-        }
-        groups.push(quotations.buffer());
-        quotations.buffer_clear();
-    }
-}
-
-fn handle_double_quote(quotations: &mut Quotations, groups: &mut Vec<String>) {
-    if quotations.escaped {
-        quotations.buffer_push('"');
-        quotations.escaped = false;
-    } else if quotations.double_quote {
-        quotations.double_quote = false;
-        groups.push(quotations.buffer());
-        quotations.buffer_clear();
-    } else if quotations.is_already_inside_quotations() {
-        quotations.buffer.push('"');
-    } else {
-        quotations.double_quote = true;
-        if !quotations.single_quote {
-            if !quotations.buffer.is_empty() && quotations.buffer_single_whitespace().is_empty() {
-                quotations.buffer = ' '.to_string();
-            } else {
-                quotations.buffer = quotations.buffer_single_whitespace();
-            }
-        }
-        groups.push(quotations.buffer());
-        quotations.buffer_clear();
-    }
-}
-
-fn handle_backtick(quotations: &mut Quotations, groups: &mut Vec<String>) {
-    if quotations.escaped {
-        quotations.buffer_push('`');
-        quotations.escaped = false;
-    } else if quotations.backtick {
-        quotations.single_quote = false;
-        groups.push(quotations.buffer());
-        quotations.buffer_clear();
-    } else if quotations.is_already_inside_quotations() {
-        quotations.buffer_push('`');
-    } else {
-        quotations.backtick = true;
-        if !quotations.single_quote {
-            if !quotations.buffer.is_empty() && quotations.buffer_single_whitespace().is_empty() {
-                quotations.buffer = ' '.to_string();
-            } else {
-                quotations.buffer = quotations.buffer_single_whitespace();
-            }
-        }
-        groups.push(quotations.buffer());
-        quotations.buffer_clear();
-    }
-}
-
-fn handle_escape(quotations: &mut Quotations) {
-    if quotations.single_quote || (quotations.escaped && quotations.is_already_inside_quotations())
-    {
-        quotations.buffer_push('\\');
-    }
-    quotations.escaped = true;
-}
-
-fn handle_other_chars(quotations: &mut Quotations, param_char: char) {
-    if quotations.escaped {
-        quotations.buffer_push(param_char);
-        quotations.escaped = false;
-    }
-    if param_char.is_whitespace() {
-        quotations.buffer_push(' ');
-    } else {
-        quotations.buffer_push(param_char);
-    }
-}
-
-struct Quotations {
-    pub single_quote: bool,
-    pub double_quote: bool,
-    pub braces: bool,
-    pub parenthesis: bool,
-    pub backtick: bool,
-    pub escaped: bool,
-    buffer: String,
-}
-
-impl Quotations {
-    fn is_already_inside_quotations(&self) -> bool {
-        self.single_quote || self.double_quote || self.braces || self.parenthesis || self.backtick
-    }
-
-    fn buffer_push(&mut self, param_char: char) {
-        self.buffer.push(param_char);
-    }
-
-    fn buffer_clear(&mut self) {
-        self.buffer.clear();
-    }
-
-    fn buffer(&self) -> String {
-        self.buffer.clone()
-    }
-
-    fn buffer_single_whitespace(&self) -> String {
-        self.buffer
-            .split_whitespace()
-            .collect::<Vec<&str>>()
-            .join(" ")
+        program_exists
     }
 }

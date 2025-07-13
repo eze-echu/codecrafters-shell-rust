@@ -1,4 +1,6 @@
 mod command;
+mod quotations;
+
 use command::*;
 
 use anyhow::Context;
@@ -15,7 +17,7 @@ fn main() {
         // Wait for user input
         let stdin = io::stdin();
         let mut input = String::new();
-        
+
         let _ = stdin
             .read_line(&mut input)
             .with_context(|| "failed to read input");

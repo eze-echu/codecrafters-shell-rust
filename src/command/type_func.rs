@@ -5,19 +5,21 @@ pub fn type_func_command(param: String) -> Result<Command> {
     if param.is_empty() {
         return Err(CommandError::MissingOnlyArgument {
             command: "type".into(),
-        }.into());
+        }
+        .into());
     }
     if param.split(" ").count() != 1 {
         return Err(CommandError::TooManyArguments {
             command: "type".into(),
-        }.into())
+        }
+        .into());
     }
     if BUILTINS.contains(&param.as_str()) {
         Ok(Command {
             execution: Box::new(move || println!("{} is a shell builtin", param)),
         })
     } else {
-        let path_programs = Command::programs_on_path();
+        let path_programs = Command::source_path();
         if path_programs.contains_key(param.as_str()) {
             Ok(Command {
                 execution: Box::new(move || {
@@ -39,9 +41,9 @@ pub fn type_func_command(param: String) -> Result<Command> {
 
 #[cfg(test)]
 mod tests {
-    use crate::command::CommandError;
     use crate::command::echo::echo;
     use crate::command::type_func::type_func_command;
+    use crate::command::CommandError;
 
     #[test]
     fn err_missing_argument() {
@@ -49,18 +51,17 @@ mod tests {
         assert!(func.is_err());
         assert_eq!(func.err().unwrap().to_string(), "type: missing argument.");
     }
-    
+
     #[test]
     fn err_multiple_arguments() {
         let func = type_func_command(String::from("arg1 arg2"));
         assert!(func.is_err());
         assert_eq!(func.err().unwrap().to_string(), "type: too many arguments.");
     }
-    
+
     #[test]
     fn builtin_command() {
         let built_command = type_func_command(String::from("cd"));
         assert!(built_command.is_ok());
     }
-
 }
