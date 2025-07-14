@@ -49,13 +49,13 @@ impl FromStr for Command {
         match command {
             "exit" => Ok(Command {
                 execution: Box::new(move || {
-                    std::process::exit(i32::from_str(param.as_str()).unwrap_or(0))
+                    std::process::exit(i32::from_str(param.join(" ").as_str()).unwrap_or(0))
                 }),
             }),
-            "echo" => Ok(echo(param)),
-            "type" => type_func_command(param.trim().to_string()),
+            "echo" => Ok(echo(param.join(""))),
+            "type" => type_func_command(param[0].clone()),
             "pwd" => pwd(),
-            "cd" => cd(param.trim().to_string()),
+            "cd" => cd(param.join(" ")),
             _ => {
                 if Self::binary_exists_on_path(command) {
                     let command = command.trim().to_string();
@@ -63,7 +63,7 @@ impl FromStr for Command {
                         execution: Box::new(move || {
                             let stdout = String::from_utf8(
                                 std::process::Command::new(command)
-                                    .args(vec![param])
+                                    .args(param)
                                     .spawn()
                                     .unwrap()
                                     .wait_with_output()

@@ -2,8 +2,8 @@ const SINGLE: char = '\'';
 const DOUBLE: char = '\"';
 const ESCAPE: char = '\\';
 
-pub fn parse_quotes(param: &str) -> String {
-    let mut quotes_stack: Vec<char> = Vec::new();
+pub fn parse_quotes(param: &str) -> Vec<String> {
+    let mut result: Vec<String> = vec![];
     let mut escape: bool = false;
     let mut literal: bool = false;
     let mut double_quotes: bool = false;
@@ -45,14 +45,22 @@ pub fn parse_quotes(param: &str) -> String {
                 }
             }
             _ => {
-                buf.push(c);
-                if escape {
-                    escape = false;
+                if (!double_quotes && !literal) && c == ' ' {
+                    result.push(buf.iter().collect());
+                    buf.clear();
+                } else {
+                    buf.push(c);
+                    if escape {
+                        escape = false;
+                    }
                 }
             }
         }
     }
-    buf.into_iter().collect()
+    if !buf.is_empty() {
+        result.push(buf.iter().collect());
+    }
+    result
 }
 
 #[cfg(test)]
@@ -63,12 +71,12 @@ mod tests {
     fn single_quotes() {
         let a = "\'this is a      test \\n a\'";
         let b = parse_quotes(a);
-        assert_eq!(r"this is a      test \n a", b);
+        assert_eq!(r"this is a      test \n a", b.iter().next().unwrap());
     }
     #[test]
     fn double_quotes() {
         let a = r#""before\   after""#;
         let b = parse_quotes(a);
-        assert_eq!(r#""before   after""#, b);
+        assert_eq!(r#""before   after""#, b.iter().next().unwrap());
     }
 }
