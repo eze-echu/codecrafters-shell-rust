@@ -13,8 +13,11 @@ pub fn parse_quotes(param: &str) -> String {
             SINGLE => {
                 if literal {
                     literal = false;
-                } else if double_quotes {
+                } else if double_quotes || escape {
                     buf.push(c);
+                    if escape {
+                        escape = false;
+                    }
                 } else {
                     literal = true;
                 }
@@ -24,7 +27,9 @@ pub fn parse_quotes(param: &str) -> String {
                     buf.push(c);
                 } else if escape && !double_quotes {
                     buf.push(c);
-                    escape = false;
+                    if escape {
+                        escape = false;
+                    }
                 } else {
                     double_quotes = !double_quotes;
                 }
