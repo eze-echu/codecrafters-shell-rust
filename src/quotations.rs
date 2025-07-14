@@ -39,7 +39,7 @@ pub fn parse_quotes(param: &str) -> Vec<String> {
                     buf.push(c);
                 } else if !escape {
                     escape = true;
-                } else {
+                } else if escape {
                     buf.push(c);
                     escape = false;
                 }
@@ -47,7 +47,9 @@ pub fn parse_quotes(param: &str) -> Vec<String> {
             _ => {
                 if (!double_quotes && !literal) && c == ' ' {
                     result.push(buf.iter().collect());
+                    escape = false;
                     buf.clear();
+                    buf.push(c);
                 } else {
                     buf.push(c);
                     if escape {
