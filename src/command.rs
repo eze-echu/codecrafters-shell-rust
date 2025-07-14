@@ -1,4 +1,6 @@
+use std::ffi::{OsStr, OsString};
 use std::fs;
+use std::os::unix::prelude::OsStrExt;
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -13,6 +15,8 @@ use cd::cd;
 
 mod pwd;
 use pwd::pwd;
+
+use crate::quotations::parse_quotes;
 
 const BUILTINS: &[&str] = &["type", "exit", "echo", "cd", "pwd"];
 
@@ -41,7 +45,7 @@ impl FromStr for Command {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (command, param) = s.split_at(s.find(' ').unwrap_or(s.len()));
-        let param = param.trim().to_string();
+        let param = parse_quotes(param.trim());
         match command {
             "exit" => Ok(Command {
                 execution: Box::new(move || {
@@ -49,9 +53,9 @@ impl FromStr for Command {
                 }),
             }),
             "echo" => Ok(echo(param)),
-            "type" => type_func_command(param),
+            "type" => type_func_command(param.trim().to_string()),
             "pwd" => pwd(),
-            "cd" => cd(param),
+            "cd" => cd(param.trim().to_string()),
             _ => {
                 if Self::binary_exists_on_path(command) {
                     let command = command.trim().to_string();
@@ -59,7 +63,7 @@ impl FromStr for Command {
                         execution: Box::new(move || {
                             let stdout = String::from_utf8(
                                 std::process::Command::new(command)
-                                    .args(param.split_ascii_whitespace())
+                                    .args(vec![param])
                                     .spawn()
                                     .unwrap()
                                     .wait_with_output()
@@ -67,7 +71,7 @@ impl FromStr for Command {
                                     .stdout,
                             )
                             .unwrap();
-                            print!("{}", stdout);
+                            println!("{stdout}");
                         }),
                     })
                 } else {
