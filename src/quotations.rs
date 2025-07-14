@@ -41,6 +41,9 @@ pub fn parse_quotes(param: &str) -> String {
             }
             _ => {
                 buf.push(c);
+                if escape {
+                    escape = false;
+                }
             }
         }
     }
